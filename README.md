@@ -1,4 +1,4 @@
-# sync
+# syncEvents
 A WordPress plugin work with backend & frontend CPT.
 
 - Backend: Get API data throug ajax and create CPT GRID
@@ -10,7 +10,7 @@ A WordPress plugin work with backend & frontend CPT.
 ## Short codes
 - Example1: [event-random-list view=2 num=20 sort=new-first] get 20 record for eventd CPT with template 2 and recent event first
 - If `sort` value is "old-first" then older event will display first, if sort not available then random
-- Example2: [al-event-info] get event info from API in any custom post type
+- Example2: [al-event-info] get event info
 - you may make a child theme of twenty twenty four with single-eventd.html template and use example 2 shortcode
 
 ## Requirements

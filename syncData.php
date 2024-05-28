@@ -230,6 +230,7 @@ function eventd_sync() {
   }
 
   foreach ($sliced as $event) {
+    //format datetime b4 insert otherwise meta value date will not work in search
     $time_d = strtotime($event['eventdatetime']);
     $time_t = strtotime($event['eventstarttime']);
     $time_ed = strtotime($event['eventenddate']);
