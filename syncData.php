@@ -300,12 +300,24 @@ function eventd_random_list($atts) {
   $view = trim($atts['view']);
   $preHTML = file_get_contents(plugin_dir_path(__FILE__) . 'templates/template' . $view . '/preHTML.php');
   $postHTML = file_get_contents(plugin_dir_path(__FILE__) . 'templates/template' . $view . '/postHTML.php');
-
-  $posts = get_posts([
+  
+  $args = [
       'post_type' => 'eventd',
       'post_status' => 'publish',
       'numberposts' => trim($atts['num'])
-  ]);
+  ];
+  if (isset($atts['sort'])) {
+    $order = 'ASC';
+    if($atts['sort'] == 'new-first'){
+      $order = 'DESC';
+    }
+    $args['meta_key'] = 'ev_startd';
+    $args['orderby'] = 'meta_value';
+    $args['order'] = $order;
+  }else{
+    $args['orderby'] = 'rand';
+  }
+  $posts = get_posts($args);
 
   $thebox = file_get_contents(plugin_dir_path(__FILE__) . 'templates/template' . trim($atts['view']) . '/main.php');
 
