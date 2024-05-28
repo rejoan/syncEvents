@@ -9,8 +9,7 @@ A WordPress plugin work with backend & frontend CPT.
 ## Short codes
 - Example1: [event-random-list view=2 num=20] get 20 record for eventd CPT with template 2
 - Example2: [al-event-info] get event info from API in any custom post type
-- Example3: [al-map-display] get map of address for the post
-- you may make a child theme of twenty twenty four with single-eventd.html template and use example 2,3 shortcode
+- you may make a child theme of twenty twenty four with single-eventd.html template and use example 2 shortcode
 
 ## Requirements
 1. First clone the repo
@@ -19,12 +18,7 @@ git clone git@github.com:rejoan/syncEvents.git && cd syncEvents
 ```
 2. Then install the plugin and activate
 
-3. In wp-config.php put your map key for shortcode [al-map-display]
-
-```
-define('API_KEY_GOOGLE', 'google_map_api_key');
-```
-4. In syncData.php replace API endpoint with yours
+3. In syncData.php replace API endpoint with yours
 ```
 https://api.prospectbox.co
 ```

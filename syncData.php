@@ -22,15 +22,14 @@ if (!class_exists('syncEvents')) {
      * Setting up Hooks
      */
     public function setup_actions() {
-      // Add Custom JS to admin panel
-      add_action('init', array($this, 'api_data'));
+      add_action('init', array($this, 'eventd_data'));
     }
 
 
     /**
      * Custom Post Type
      */
-    public function api_data() {
+    public function eventd_data() {
       $labels = array(
           'archives' => __('Item Archives'),
           'attributes' => __('Item Attributes'),
@@ -100,11 +99,11 @@ function eventd_adjust_queries($query){
    if (is_admin() && $post_type == 'eventd') {
         $query->set('meta_key', 'ev_startd');
         $query->set('meta_query', $meta_query);
-
    }
 }
 add_action('pre_get_posts', 'eventd_adjust_queries' );
 
+//wordpress sql string
 add_filter('query', 'get_sql');
 function get_sql($query){
   //check if this is your query,
@@ -215,6 +214,7 @@ function eventd_sync() {
   global $wpdb;
   $query = 'SELECT * FROM ' . $wpdb->prefix . 'posts WHERE post_type = "eventd" ORDER BY ID DESC LIMIT 1';
   $row = $wpdb->get_row($query);
+  //check latest rows and take only new data
   if (!empty($row)) {
     $query1 = 'SELECT * FROM ' . $wpdb->prefix . 'postmeta WHERE post_id= ' . $row->ID . ' AND meta_key = "ev_id" ORDER BY meta_id DESC LIMIT 1';
     $row1 = $wpdb->get_row($query1);
@@ -224,9 +224,7 @@ function eventd_sync() {
       $sliced = array_slice($events, $offset);
     }
   }
-
-
-  if (empty($sliced)) {
+  if (empty($sliced)){
     echo json_encode(array('code' => 'empty'));
     die;
   }
@@ -333,40 +331,14 @@ add_shortcode('al-event-info', 'eventd_info');
 function eventd_info() {
   global $post;
   ob_start();
-  echo '<h3 class="">Event Information</h3><p>Email: ' . get_post_meta($post->ID, 'bEmail', true) . '</p><p>Phone: ' . get_post_meta($post->ID, 'bPhone', true) . '</p><p>User: ' . get_post_meta($post->ID, 'bUser', true) . '</p>';
+  $date_start = \DateTimeImmutable::createFromFormat('Y-m-d', get_post_meta($post->ID, 'ev_startd', true));
+  $date_end = \DateTimeImmutable::createFromFormat('Y-m-d', get_post_meta($post->ID, 'ev_endd', true));
+  echo '<h3 class="">Event Information</h3><p>Summary: ' . get_post_meta($post->ID, 'ev_summary', true) . '</p><p>Start Date: ' . $date_start->format('d M, y') . '</p><p>Start Time: ' . get_post_meta($post->ID, 'ev_startt', true) . '</p><p>End Date: ' . $date_end->format('d M, y').'<p>End Time: ' . get_post_meta($post->ID, 'ev_endt', true) . '</p>';
   $ret = ob_get_contents();
   ob_end_clean();
   return $ret;
 }
 
-
-add_shortcode('al-map-display', 'eventd_map_display');
-
-function eventd_map_display() {
-  global $post;
-  $address = get_post_meta($post->ID, 'bAddress', true);
-  $city = get_post_meta($post->ID, 'bCity', true);
-  $country = get_post_meta($post->ID, 'bCountry', true);
-  if (empty($address)) {
-    $map = '<p>No Address Found</p>';
-  } else {
-    $addressArr = explode(' ', $address);
-    if (!empty($city)) {
-      array_push($addressArr, $city);
-    }
-    if (!empty($country)) {
-      array_push($addressArr, $country);
-    }
-    $place = implode('+', $addressArr);
-
-    $map = '<iframe width="450" height="250" frameborder="0" style="border:0" referrerpolicy="no-referrer-when-downgrade" src="https://www.google.com/maps/embed/v1/place?key=' . API_KEY_GOOGLE . '&q=' . $place . '" allowfullscreen></iframe>';
-  }
-  ob_start();
-  echo '<h3 class="">Map</h3><div id="map">' . $map . '</div>';
-  $ret = ob_get_contents();
-  ob_end_clean();
-  return $ret;
-}
 add_action('wp_enqueue_scripts', 'eventd_enqueue_styles', 11);
 
 function eventd_enqueue_styles() {
