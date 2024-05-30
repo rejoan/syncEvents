@@ -25,7 +25,6 @@ if (!class_exists('syncEvents')) {
       add_action('init', array($this, 'eventd_data'));
     }
 
-
     /**
      * Custom Post Type
      */
@@ -77,37 +76,38 @@ if (!class_exists('syncEvents')) {
   $syncEvents = new syncEvents();
 }
 
-
-function eventd_adjust_queries($query){
+function eventd_adjust_queries($query) {
   global $post_type;
   $meta_query = array();
   $compare = '=';
-  if(isset($_GET['u'])){
+  if (isset($_GET['u'])) {
     $compare = '>=';
   }
-  if(isset($_GET['sd']) && !empty($_GET['sd'])){
+  if (isset($_GET['sd']) && !empty($_GET['sd'])) {
     $d = esc_attr($_GET['sd']);
     $date = \DateTimeImmutable::createFromFormat('d/m/y', $d);
     $startd = array(
-                'key'     => 'ev_startd',
-                'compare' => $compare,
-                'value'   => $date->format('Y-m-d'),
-                'type'   => 'DATE'
-            );
+        'key' => 'ev_startd',
+        'compare' => $compare,
+        'value' => $date->format('Y-m-d'),
+        'type' => 'DATE'
+    );
     $meta_query[] = $startd;
   }
-   if (is_admin() && $post_type == 'eventd') {
-        $query->set('meta_key', 'ev_startd');
-        $query->set('meta_query', $meta_query);
-   }
+  if (is_admin() && $post_type == 'eventd') {
+    $query->set('meta_key', 'ev_startd');
+    $query->set('meta_query', $meta_query);
+  }
 }
-add_action('pre_get_posts', 'eventd_adjust_queries' );
+
+add_action('pre_get_posts', 'eventd_adjust_queries');
 
 //wordpress sql string
 add_filter('query', 'get_sql');
-function get_sql($query){
+
+function get_sql($query) {
   //check if this is your query,
-  if(strpos($query, "'ev_startd'")>0){
+  if (strpos($query, "'ev_startd'") > 0) {
     //var_dump($query);return;
   }
   return $query;
@@ -122,23 +122,23 @@ add_action('manage_posts_extra_tablenav', 'eventd_button_to_views');
  */
 function eventd_button_to_views($which) {
   global $post_type;
-  if($which == 'top' && $post_type == 'eventd'){
+  if ($which == 'top' && $post_type == 'eventd') {
     $parts = parse_url(home_url());
     $port = '';
-    if(isset($parts['port'])){
+    if (isset($parts['port'])) {
       $port = $parts['port'];
     }
-    
+
     $gargs = array(
         'sd' => date('d/m/y'),
         'u' => 'y'
     );
     $upcoming_url = $parts['scheme'] . '://' . $parts['host'] . ':' . $port . add_query_arg($gargs);
     $sd = '';
-    if(isset($_GET['sd'])){
+    if (isset($_GET['sd'])) {
       $sd = esc_attr($_GET['sd']);
     }
-    echo '<p class="s-para"><input class="datetimepicker" name="sd" type="text" autocomplete="off" placeholder="Select Date" value="'.$sd.'"></p><p class="s-para"><a title="Upcoming Events" href="'.$upcoming_url.'" class="button">Upcoming</a></p><p id="button-section"><button id="sync_data" title="Extract Events by API" class="button button-primary">Sync Data</button></p><input type="hidden" id="admin_url" value="' . admin_url() . '"><input type="hidden" id="plugin_url" value="' . plugins_url() . '">';
+    echo '<p class="s-para"><input class="datetimepicker" name="sd" type="text" autocomplete="off" placeholder="Select Date" value="' . $sd . '"></p><p class="s-para"><a title="Upcoming Events" href="' . $upcoming_url . '" class="button">Upcoming</a></p><p id="button-section"><button id="sync_data" title="Extract Events by API" class="button button-primary">Sync Data</button></p><p id="counter" style="font-weight:bolder;margin:4px 0 0 10px;position:absolute;left:60%;">1%</p><input type="hidden" id="admin_url" value="' . admin_url() . '"><input type="hidden" id="plugin_url" value="' . plugins_url() . '">';
   }
 }
 
@@ -190,9 +190,10 @@ function eventd_sync() {
   if (!isset($_POST['action']) && ($_POST['action'] != 'eventd_sync')) {
     exit('The form is not valid');
   }
-
+  $ran = array(1,2,6);
+  $randomElement = $ran[array_rand($ran, 1)];
   $ch = curl_init();
-  curl_setopt($ch, CURLOPT_URL, "https://api.prospectbox.co/ytevents?site=&api_key=123456");
+  curl_setopt($ch, CURLOPT_URL, "https://api.prospectbox.co/ytevents?site=".$randomElement."&api_key=123456");
   curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
   curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "GET");
   curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
@@ -224,11 +225,13 @@ function eventd_sync() {
       $sliced = array_slice($events, $offset);
     }
   }
-  if (empty($sliced)){
+  if (empty($sliced)) {
     echo json_encode(array('code' => 'empty'));
     die;
   }
 
+  $numItems = count($sliced);
+  $i = 0;
   foreach ($sliced as $event) {
     //format datetime b4 insert otherwise meta value date will not work in search
     $time_d = strtotime($event['eventdatetime']);
@@ -238,37 +241,70 @@ function eventd_sync() {
     $rowData = array(
         'ev_id' => $event['id'],
         'ev_summary' => $event['eventsummary'],
-        'ev_startd' => date('Y-m-d',$time_d),
-        'ev_startt' => date('H:i:s',$time_t),
-        'ev_endd' => date('Y-m-d',$time_ed),
-        'ev_endt' => date('H:i:s',$time_et),
+        'ev_startd' => date('Y-m-d', $time_d),
+        'ev_startt' => date('H:i:s', $time_t),
+        'ev_endd' => date('Y-m-d', $time_ed),
+        'ev_endt' => date('H:i:s', $time_et),
         'ev_link' => $event['eventlink'],
         'ev_slug' => $event['slug'],
-        'ev_image' => $event['image'],
+        'ev_image' => str_replace(' ', '_',$event['image']),
         'ev_active' => $event['active'],
         'ev_inserted' => $event['timestamp']
     );
     $post_id = wp_insert_post(
-            array(
-                'post_type' => 'eventd',
-                'post_title' => $event['eventname'],
-                'post_content' => $event['eventdescription'],
-                'post_status' => 'publish'
-            )
+      array(
+          'post_type' => 'eventd',
+          'post_title' => $event['eventname'],
+          'post_content' => $event['eventdescription'],
+          'post_status' => 'publish'
+      )
     );
     foreach ($rowData as $mkey => $metaV) {
       add_post_meta($post_id, $mkey, $metaV);
     }
+    if(!empty($event['image'])){
+      $url = 'https://app.prospectbox.co/assets/img/yt/thumbs/' . rawurlencode($event['image']);
+      $ch1 = curl_init($url);
+      curl_setopt($ch1, CURLOPT_HEADER, 0);
+      curl_setopt($ch1, CURLOPT_RETURNTRANSFER, 1);
+      curl_setopt($ch1, CURLOPT_BINARYTRANSFER, 1);
+      curl_setopt($ch1, CURLOPT_SSL_VERIFYPEER, false);
+      curl_setopt($ch1, CURLOPT_SSL_VERIFYHOST, false);
+      curl_setopt($ch1, CURLOPT_NOBODY, false);
+      $raw = curl_exec($ch1);
+      $httpCode = curl_getinfo($ch1, CURLINFO_HTTP_CODE);
+      curl_close($ch1);
+      if ($httpCode == 200) {
+        $saveto = WP_PLUGIN_DIR . '/syncEvents/images/' . str_replace(' ', '_',$event['image']);
+        if (file_exists($saveto)) {
+          unlink($saveto);
+        }
+        $fp = fopen($saveto, 'x');
+        fwrite($fp, $raw);
+        fclose($fp);
+        if($numItems === $i++) {
+          echo json_encode(array('code' => 'done'));
+          die;
+        }
+      }
+    }
   }
-  echo json_encode(array('code' => 'done'));
-  die;
 }
 
+// delete images downloaded before when post created
+add_action('before_delete_post', 'eventd_delete_post');
+function eventd_delete_post($postid){
+  $img = get_post_meta($postid, 'ev_image', true);
+  $file_path = WP_PLUGIN_DIR . '/syncEvents/images/' . $img;
+  if (file_exists($file_path)) {
+    unlink($file_path);
+  }
+}
 add_action('admin_enqueue_scripts', 'eventd_backend_assets');
 
 function eventd_backend_assets() {
   global $post_type;
-  if($post_type == 'eventd'){
+  if ($post_type == 'eventd') {
     wp_enqueue_script('eventd-script', plugins_url('syncD.js', __FILE__));
     wp_enqueue_style('style-common', plugins_url('/style.css', __FILE__));
     wp_enqueue_script('datetimepicker', plugins_url('/datetimepicker/jquery.datetimepicker.full.min.js', __FILE__));
@@ -301,7 +337,7 @@ function eventd_random_list($atts) {
   $view = trim($atts['view']);
   $preHTML = file_get_contents(plugin_dir_path(__FILE__) . 'templates/template' . $view . '/preHTML.php');
   $postHTML = file_get_contents(plugin_dir_path(__FILE__) . 'templates/template' . $view . '/postHTML.php');
-  
+
   $args = [
       'post_type' => 'eventd',
       'post_status' => 'publish',
@@ -309,13 +345,13 @@ function eventd_random_list($atts) {
   ];
   if (isset($atts['sort'])) {
     $order = 'ASC';
-    if($atts['sort'] == 'new-first'){
+    if ($atts['sort'] == 'new-first') {
       $order = 'DESC';
     }
     $args['meta_key'] = 'ev_startd';
     $args['orderby'] = 'meta_value';
     $args['order'] = $order;
-  }else{
+  } else {
     $args['orderby'] = 'rand';
   }
   $posts = get_posts($args);
@@ -346,7 +382,11 @@ function eventd_info() {
   ob_start();
   $date_start = \DateTimeImmutable::createFromFormat('Y-m-d', get_post_meta($post->ID, 'ev_startd', true));
   $date_end = \DateTimeImmutable::createFromFormat('Y-m-d', get_post_meta($post->ID, 'ev_endd', true));
-  echo '<h3 class="">Event Information</h3><p>Summary: ' . get_post_meta($post->ID, 'ev_summary', true) . '</p><p>Start Date: ' . $date_start->format('d M, y') . '</p><p>Start Time: ' . get_post_meta($post->ID, 'ev_startt', true) . '</p><p>End Date: ' . $date_end->format('d M, y').'<p>End Time: ' . get_post_meta($post->ID, 'ev_endt', true) . '</p>';
+  $img = '';
+  if(!empty(get_post_meta($post->ID, 'ev_image', true))){
+    $img = '<img src="'.plugins_url('syncEvents/images/'). get_post_meta($post->ID, 'ev_image', true).'" alt="event-image"/>';
+  }
+  echo '<h3 class="">Event Information</h3><p>'.$img.'</p><p>Summary: ' . get_post_meta($post->ID, 'ev_summary', true) . '</p><p>Start Date: ' . $date_start->format('d M, y') . '</p><p>Start Time: ' . get_post_meta($post->ID, 'ev_startt', true) . '</p><p>End Date: ' . $date_end->format('d M, y') . '<p>End Time: ' . get_post_meta($post->ID, 'ev_endt', true) . '</p>';
   $ret = ob_get_contents();
   ob_end_clean();
   return $ret;
