@@ -1,5 +1,4 @@
 <?php
-
 /*
   Plugin Name: Sync Events
   description: A simple custom plugin to get API data
@@ -22,7 +21,121 @@ if (!class_exists('syncEvents')) {
      * Setting up Hooks
      */
     public function setup_actions() {
+      add_action('admin_menu', array($this, 'eventd_plugin_page'));
+      add_action('admin_init', array($this, 'synced_page_init'));
       add_action('init', array($this, 'eventd_data'));
+    }
+
+    /**
+     * Add options page
+     */
+    public function eventd_plugin_page() {
+      // This page will be under "Settings"
+      add_options_page(
+              'Synced CPT Settings',
+              'Synced CPT Settings',
+              'manage_options',
+              'synced-cpt-settings',
+              array($this, 'scpt_admin_page')
+      );
+    }
+
+    /**
+     * Options page callback
+     */
+    public function scpt_admin_page() {
+      // Set class property
+      $this->options = get_option('synced_display_options');
+      ?>
+      <div class="wrap">
+        <h1>Synced CPT Settings</h1>
+        <form method="post" action="options.php" enctype="multipart/form-data">
+          <?php
+          // This prints out all hidden setting fields
+          settings_fields('synced_display_options_group');
+          do_settings_sections('synced-cpt-settings');
+          submit_button();
+          ?>
+        </form>
+      </div>
+      <?php
+    }
+
+    /**
+     * Register and add settings
+     */
+    public function synced_page_init() {
+      register_setting(
+              'synced_display_options_group', // Option group
+              'synced_display_options', // Option name
+              array($this, 'sanitize') // Sanitize
+      );
+
+      add_settings_section(
+              'synced_settings_section_id', // ID
+              'Fill the params Below', // Title
+              array($this, 'print_section_info'), // Callback
+              'synced-cpt-settings' // Page
+      );
+
+      add_settings_field(
+              'api_key', // ID
+              'Api Key', // Title 
+              array($this, 'api_key_callback'), // Callback
+              'synced-cpt-settings', // Page
+              'synced_settings_section_id' // Section           
+      );
+
+      add_settings_field(
+              'api_url',
+              'Api URL', // Title 
+              array($this, 'api_url_callback'), // Callback
+              'synced-cpt-settings', // Page
+              'synced_settings_section_id' // Section           
+      );
+    }
+
+    /**
+     * Sanitize each setting field as needed
+     *
+     * @param array $input Contains all settings fields as array keys
+     */
+    public function sanitize($input) {
+      $new_input = array();
+      if (isset($input['api_key'])) {
+        $new_input['api_key'] = sanitize_text_field($input['api_key']);
+      }
+      if (isset($input['api_url'])) {
+        $new_input['api_url'] = sanitize_text_field($input['api_url']);
+      }
+
+      return $new_input;
+    }
+
+    /**
+     * Print the Section text
+     */
+    public function print_section_info() {
+      //print 'Enter your information below:';
+    }
+
+    /**
+     * Get the settings option array and print one of its values
+     */
+    public function api_key_callback() {
+      printf(
+              '<input type="text" id="api_key" name="synced_display_options[api_key]" value="%s" />',
+              isset($this->options['api_key']) ? esc_attr($this->options['api_key'])
+                        : ''
+      );
+    }
+
+    public function api_url_callback() {
+      printf(
+              '<input type="text" id="api_url" name="synced_display_options[api_url]" value="%s" />',
+              isset($this->options['api_url']) ? esc_attr($this->options['api_url'])
+                        : ''
+      );
     }
 
     /**
@@ -190,10 +303,12 @@ function eventd_sync() {
   if (!isset($_POST['action']) && ($_POST['action'] != 'eventd_sync')) {
     exit('The form is not valid');
   }
-  $ran = array(1,2,6);
+  $ran = array(1, 2, 6);
   $randomElement = $ran[array_rand($ran, 1)];
   $ch = curl_init();
-  curl_setopt($ch, CURLOPT_URL, "https://api.prospectbox.co/ytevents?site=".$randomElement."&api_key=123456");
+  $api_url = get_option('synced_display_options')['api_url'];
+  $api_key = get_option('synced_display_options')['api_key'];
+  curl_setopt($ch, CURLOPT_URL, $api_url."/ytevents?site=" . $randomElement . "&api_key=".$api_key);
   curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
   curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "GET");
   curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
@@ -247,22 +362,22 @@ function eventd_sync() {
         'ev_endt' => date('H:i:s', $time_et),
         'ev_link' => $event['eventlink'],
         'ev_slug' => $event['slug'],
-        'ev_image' => str_replace(' ', '_',$event['image']),
+        'ev_image' => str_replace(' ', '_', $event['image']),
         'ev_active' => $event['active'],
         'ev_inserted' => $event['timestamp']
     );
     $post_id = wp_insert_post(
-      array(
-          'post_type' => 'eventd',
-          'post_title' => $event['eventname'],
-          'post_content' => $event['eventdescription'],
-          'post_status' => 'publish'
-      )
+            array(
+                'post_type' => 'eventd',
+                'post_title' => $event['eventname'],
+                'post_content' => $event['eventdescription'],
+                'post_status' => 'publish'
+            )
     );
     foreach ($rowData as $mkey => $metaV) {
       add_post_meta($post_id, $mkey, $metaV);
     }
-    if(!empty($event['image'])){
+    if (!empty($event['image'])) {
       $url = 'https://app.prospectbox.co/assets/img/yt/thumbs/' . rawurlencode($event['image']);
       $ch1 = curl_init($url);
       curl_setopt($ch1, CURLOPT_HEADER, 0);
@@ -275,14 +390,14 @@ function eventd_sync() {
       $httpCode = curl_getinfo($ch1, CURLINFO_HTTP_CODE);
       curl_close($ch1);
       if ($httpCode == 200) {
-        $saveto = WP_PLUGIN_DIR . '/syncEvents/images/' . str_replace(' ', '_',$event['image']);
+        $saveto = WP_PLUGIN_DIR . '/syncEvents/images/' . str_replace(' ', '_', $event['image']);
         if (file_exists($saveto)) {
           unlink($saveto);
         }
         $fp = fopen($saveto, 'x');
         fwrite($fp, $raw);
         fclose($fp);
-        if($numItems === $i++) {
+        if ($numItems === $i++) {
           echo json_encode(array('code' => 'done'));
           die;
         }
@@ -293,13 +408,15 @@ function eventd_sync() {
 
 // delete images downloaded before when post created
 add_action('before_delete_post', 'eventd_delete_post');
-function eventd_delete_post($postid){
+
+function eventd_delete_post($postid) {
   $img = get_post_meta($postid, 'ev_image', true);
   $file_path = WP_PLUGIN_DIR . '/syncEvents/images/' . $img;
   if (file_exists($file_path)) {
     unlink($file_path);
   }
 }
+
 add_action('admin_enqueue_scripts', 'eventd_backend_assets');
 
 function eventd_backend_assets() {
@@ -383,10 +500,10 @@ function eventd_info() {
   $date_start = \DateTimeImmutable::createFromFormat('Y-m-d', get_post_meta($post->ID, 'ev_startd', true));
   $date_end = \DateTimeImmutable::createFromFormat('Y-m-d', get_post_meta($post->ID, 'ev_endd', true));
   $img = '';
-  if(!empty(get_post_meta($post->ID, 'ev_image', true))){
-    $img = '<img src="'.plugins_url('syncEvents/images/'). get_post_meta($post->ID, 'ev_image', true).'" alt="event-image"/>';
+  if (!empty(get_post_meta($post->ID, 'ev_image', true))) {
+    $img = '<img src="' . plugins_url('syncEvents/images/') . get_post_meta($post->ID, 'ev_image', true) . '" alt="event-image"/>';
   }
-  echo '<h3 class="">Event Information</h3><p>'.$img.'</p><p>Summary: ' . get_post_meta($post->ID, 'ev_summary', true) . '</p><p>Start Date: ' . $date_start->format('d M, y') . '</p><p>Start Time: ' . get_post_meta($post->ID, 'ev_startt', true) . '</p><p>End Date: ' . $date_end->format('d M, y') . '<p>End Time: ' . get_post_meta($post->ID, 'ev_endt', true) . '</p>';
+  echo '<h3 class="">Event Information</h3><p>' . $img . '</p><p>Summary: ' . get_post_meta($post->ID, 'ev_summary', true) . '</p><p>Start Date: ' . $date_start->format('d M, y') . '</p><p>Start Time: ' . get_post_meta($post->ID, 'ev_startt', true) . '</p><p>End Date: ' . $date_end->format('d M, y') . '<p>End Time: ' . get_post_meta($post->ID, 'ev_endt', true) . '</p>';
   $ret = ob_get_contents();
   ob_end_clean();
   return $ret;
